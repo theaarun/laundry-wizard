@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Ultimate Vibe Dry 4.0</title>
+    <style>
+        /* --- THE SETUP --- */
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            margin: 0; 
+            height: 100vh; 
+            overflow: hidden; /* Keeps scrollbars away */
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA); /* Default Sky */
+            transition: background 1s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- THE APP CARD --- */
+        .app-card { 
+            position: relative;
+            z-index: 10; /* Keeps the app ON TOP of the rain/snow */
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 30px; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2); 
+            width: 450px;
+            text-align: center;
+            max-width: 90%;
+        }
+
+        /* --- INPUTS AND BUTTONS --- */
+        input { 
+            padding: 12px; border: 2px solid #ddd; border-radius: 10px; width: 60%; font-size: 1rem; 
+        }
+        .search-btn { 
+            padding: 12px; background: #2196F3; color: white; border: none; border-radius: 10px; cursor: pointer; 
+        }
+        .wardrobe { 
+            display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; 
+        }
+        .item-btn { 
+            padding: 10px 15px; background: white; border: 2px solid #eee; border-radius: 10px; cursor: pointer; transition: 0.2s; 
+        }
+        .item-btn:hover { background: #E3F2FD; transform: scale(1.05); }
+
+        /* --- THE RESULTS AREA --- */
+        #weather-display { margin-top: 15px; font-size: 0.9rem; color: #555; background: #f1f1f1; padding: 10px; border-radius: 10px; }
+        #result { margin-top: 20px; font-size: 1.2rem; font-weight: bold; padding: 15px; border-radius: 10px; display: none; }
+        .warning { background-color: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+
+        /* --- ANIMATION EFFECTS (CSS Magic) --- */
+        .effect-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+        
+        /* Rain Animation */
+        .raindrop {
+            position: absolute; background: #0055ff; width: 2px; height: 15px; top: -20px;
+            animation: fall linear infinite; opacity: 0.6;
+        }
+        /* Snow Animation */
+        .snowflake {
+            position: absolute; background: white; width: 8px; height: 8px; border-radius: 50%; top: -10px;
+            animation: fall linear infinite; opacity: 0.8;
+        }
+        /* Cloud Animation */
+        .cloud {
+            position: absolute; background: rgba(255,255,255,0.8); border-radius: 50px;
+            animation: floatCloud linear infinite;
+        }
+
+        @keyframes fall { to { transform: translateY(105vh); } }
+        @keyframes floatCloud { from { transform: translateX(-200px); } to { transform: translateX(110vw); } }
+
+    </style>
+</head>
+<body>
+
+<div id="effects" class="effect-layer"></div>
+
+<div class="app-card">
+    <h1>🌤️ Ultimate Vibe Dry</h1>
+    
+    <div>
+        <input type="text" id="cityInput" placeholder="Enter Location (e.g. Paris)">
+        <button class="search-btn" onclick="getWeather()">🚀 Go</button>
+    </div>
+
+    <div id="weather-display">Type a city to check the atmosphere...</div>
+
+    <div class="wardrobe">
+        <button class="item-btn" onclick="calculate('T-Shirt', 60)">👕 T-Shirt</button>
+        <button class="item-btn" onclick="calculate('Jeans', 180)">👖 Jeans</button>
+        <button class="item-btn" onclick="calculate('Hoodie', 150)">🧥 Hoodie</button>
+        <button class="item-btn" onclick="calculate('Sheet', 120)">🛏️ Sheet</button>
+    </div>
+
+    <div id="result"></div>
+</div>
+
+<script>
+    // These variables hold our Science Data
+    let temp = null;     // Temperature (Celsius)
+    let humidity = null; // Humidity (%)
+    let wind = null;     // Wind Speed (km/h)
+    let pressure = null; // Pressure (hPa)
+    let weatherCode = 0; // The "Code" that tells us if it's raining
+
+    async function getWeather() {
+        let city = document.getElementById('cityInput').value;
+        if (!city) return alert("Please type a location!");
+
+        document.getElementById('weather-display').innerText = "📡 Connecting to satellites...";
+        clearEffects(); // Stop old rain/snow
+
+        try {
+            // 1. Get Coordinates
+            let geoReq = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=en&format=json`);
+            let geoData = await geoReq.json();
+            if (!geoData.results) throw new Error("City not found");
+
+            let lat = geoData.results[0].latitude;
+            let long = geoData.results[0].longitude;
+
+            // 2. Get DETAILED Weather (Pressure, Wind, Humidity, Weather Code)
+            let apiURL = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${long}&current_weather=true&hourly=relativehumidity_2m,surface_pressure`;
+            let weatherReq = await fetch(apiURL);
+            let weatherData = await weatherReq.json();
+
+            // Store the data
+            temp = weatherData.current_weather.temperature;
+            wind = weatherData.current_weather.windspeed;
+            weatherCode = weatherData.current_weather.weathercode;
+            
+            // Note: Open-Meteo gives humidity in a list, we just take the first one (closest to now)
+            humidity = weatherData.hourly.relativehumidity_2m[0];
+            pressure = weatherData.hourly.surface_pressure[0];
+
+            updateDisplay(geoData.results[0].name);
+            setVibe(weatherCode); // This turns on the animations!
+
+        } catch (err) {
+            document.getElementById('weather-display').innerText = "❌ Uh oh! Couldn't find that place.";
+            console.error(err);
+        }
+    }
+
+    function updateDisplay(cityName) {
+        document.getElementById('weather-display').innerHTML = `
+            <b>${cityName}</b> Details:<br>
+            🌡️ Temp: ${temp}°C | 💧 Humidity: ${humidity}%<br>
+            💨 Wind: ${wind} km/h | ⏲️ Pressure: ${pressure} hPa
+        `;
+    }
+
+    function setVibe(code) {
+        let body = document.body;
+        let effectBox = document.getElementById('effects');
+        
+        // Reset
+        body.style.background = "linear-gradient(to bottom, #87CEEB, #E0F7FA)"; 
+
+        // WMO Weather Codes logic
+        // 0-3: Clear/Cloudy, 51-67: Rain, 71-77: Snow, 95+: Thunderstorm
+        
+        if (code <= 3) {
+             // Sunny/Cloudy - Add some clouds
+             createClouds();
+             if (code >= 2) body.style.background = "#cfd8dc"; // Grey if cloudy
+        } 
+        else if (code >= 51 && code <= 67) {
+            // RAIN
+            body.style.background = "#455a64"; // Dark Grey
+            createParticles('rain');
+        } 
+        else if (code >= 71 && code <= 86) {
+            // SNOW
+            body.style.background = "#b0bec5"; // Cold Grey
+            createParticles('snow');
+        }
+    }
+
+    function createParticles(type) {
+        const container = document.getElementById('effects');
+        const count = type === 'rain' ? 100 : 50;
+        
+        for (let i = 0; i < count; i++) {
+            let p = document.createElement('div');
+            p.classList.add(type === 'rain' ? 'raindrop' : 'snowflake');
+            p.style.left = Math.random() * 100 + 'vw';
+            p.style.animationDuration = (Math.random() * 1 + 0.5) + 's'; // Random speed
+            p.style.opacity = Math.random();
+            container.appendChild(p);
+        }
+    }
+
+    function createClouds() {
+        const container = document.getElementById('effects');
+        for (let i = 0; i < 5; i++) {
+            let c = document.createElement('div');
+            c.classList.add('cloud');
+            c.style.width = (100 + Math.random() * 200) + 'px';
+            c.style.height = (50 + Math.random() * 50) + 'px';
+            c.style.top = (Math.random() * 50) + 'vh';
+            c.style.animationDuration = (10 + Math.random() * 20) + 's';
+            container.appendChild(c);
+        }
+    }
+
+    function clearEffects() {
+        document.getElementById('effects').innerHTML = "";
+    }
+
+    function calculate(item, baseTime) {
+        if (temp === null) return alert("Search for a location first!");
+
+        let resultBox = document.getElementById('result');
+        
+        // --- THE SCIENCE MATH ---
+        
+        // 1. Check for RAIN or SNOW immediately
+        if ((weatherCode >= 51 && weatherCode <= 67) || (weatherCode >= 71 && weatherCode <= 86) || weatherCode >= 95) {
+            resultBox.className = "warning";
+            resultBox.style.display = "block";
+            resultBox.innerHTML = `⚠️ <b>NOT SUITABLE!</b><br>It is raining or snowing outside.<br>Dry your ${item} inside!`;
+            return;
+        }
+
+        let time = baseTime;
+
+        // 2. Temperature Impact (Hotter = Faster)
+        // If it's colder than 20°C, it takes longer. If hotter, it's faster.
+        time = time - ((temp - 20) * 2); 
+
+        // 3. Humidity Impact (Humid = Slower)
+        // If humidity is high (>50%), water can't evaporate easily.
+        if (humidity > 50) {
+            time = time + ((humidity - 50) * 1.5);
+        }
+
+        // 4. Wind Impact (Windy = Faster)
+        // Wind blows the moisture away!
+        if (wind > 10) {
+            time = time - (wind * 2); 
+        }
+
+        // Safety Limits
+        if (time < 15) time = 15; // Can't dry instantly!
+
+        // If time is crazy long (over 6 hours/360 mins), warn them.
+        if (time > 360) {
+            resultBox.className = "warning";
+            resultBox.innerHTML = `⚠️ <b>Not Ideal.</b><br>It's too cold or humid.<br>It would take over 6 hours to dry your ${item}.`;
+        } else {
+            resultBox.className = "success";
+            resultBox.innerHTML = `✅ <b>Good to go!</b><br>Your <b>${item}</b> should be dry in about<br><b>${Math.round(time)} minutes</b>.`;
+        }
+        
+        resultBox.style.display = "block";
+    }
+</script>
+
+</body>
+</html>
