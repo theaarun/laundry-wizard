@@ -231,7 +231,14 @@
         resultBox.innerHTML = `⚠️ <b>Very Slow Drying.</b><br>It will take over 8 hours to dry your ${item}.`;
     } else {
         resultBox.className = "success";
-        let timeDisplay = time > 60 ? `${(time / 60).toFixed(1)} hours` : `${Math.round(time)} minutes`;
+        let timeDisplay;
+        if (time > 60) {
+            let hours = Math.floor(time / 60);
+            let minutes = Math.round(time % 60);
+            timeDisplay = `${hours} hour${hours > 1 ? 's' : ''} and ${minutes} minute${minutes > 1 ? 's' : ''}`;
+        } else {
+            timeDisplay = `${Math.round(time)} minutes`;
+        }
         resultBox.innerHTML = `${message}✅ <b>Good to go!</b><br>Your <b>${item}</b> will dry in about<br><b>${timeDisplay}</b>.`;
     }
     
