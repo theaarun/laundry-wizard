@@ -185,7 +185,14 @@
 
     let resultBox = document.getElementById('result');
     
-    // --- 1. SAFETY CHECKS (Hurricane / Rain / Snow) ---
+    // --- 1. SAFETY CHECKS (Temperature / Hurricane / Rain / Snow) ---
+    if (temp < 0) {
+        resultBox.className = "warning";
+        resultBox.style.display = "block";
+        resultBox.innerHTML = `❄️ <b>TOO COLD!</b><br>Temperature is ${temp}°C.<br>It is too cold to dry your ${item} outside!`;
+        return;
+    }
+
     if (wind > 50) {
         resultBox.className = "warning";
         resultBox.style.display = "block";
@@ -224,7 +231,8 @@
         resultBox.innerHTML = `⚠️ <b>Very Slow Drying.</b><br>It will take over 8 hours to dry your ${item}.`;
     } else {
         resultBox.className = "success";
-        resultBox.innerHTML = `${message}✅ <b>Good to go!</b><br>Your <b>${item}</b> will dry in about<br><b>${Math.round(time)} minutes</b>.`;
+        let timeDisplay = time > 60 ? `${(time / 60).toFixed(1)} hours` : `${Math.round(time)} minutes`;
+        resultBox.innerHTML = `${message}✅ <b>Good to go!</b><br>Your <b>${item}</b> will dry in about<br><b>${timeDisplay}</b>.`;
     }
     
     resultBox.style.display = "block";
